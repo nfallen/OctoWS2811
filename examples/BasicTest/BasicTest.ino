@@ -40,7 +40,7 @@
 
 #include <OctoWS2811.h>
 
-const int ledsPerStrip = 120;
+const int ledsPerStrip = 75;
 
 DMAMEM int displayMemory[ledsPerStrip*6];
 int drawingMemory[ledsPerStrip*6];
@@ -54,6 +54,7 @@ void setup() {
   leds.show();
 }
 
+/*
 #define RED    0xFF0000
 #define GREEN  0x00FF00
 #define BLUE   0x0000FF
@@ -61,9 +62,9 @@ void setup() {
 #define PINK   0xFF1088
 #define ORANGE 0xE05800
 #define WHITE  0xFFFFFF
+*/
 
 // Less intense...
-/*
 #define RED    0x160000
 #define GREEN  0x001600
 #define BLUE   0x000016
@@ -71,7 +72,7 @@ void setup() {
 #define PINK   0x120009
 #define ORANGE 0x100400
 #define WHITE  0x101010
-*/
+
 
 void loop() {
   int microsec = 2000000 / leds.numPixels();  // change them all in 2 seconds
@@ -90,9 +91,16 @@ void loop() {
 
 void colorWipe(int color, int wait)
 {
-  for (int i=0; i < leds.numPixels(); i++) {
-    leds.setPixel(i, color);
-    leds.show();
-    delayMicroseconds(wait);
+  for (int y=0; y < 8; y++) {
+    for (int x=0; x < ledsPerStrip; x++) {
+      leds.setPixel((transformY(y) * ledsPerStrip) + x, color);
+      leds.show();
+      delayMicroseconds(wait);
+    }
   }
+}
+
+int transformY(int y) {
+  int mapping[] = {4,7,5,6,0,3,1,2};
+  return mapping[y];
 }

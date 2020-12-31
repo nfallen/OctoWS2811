@@ -44,7 +44,8 @@ import processing.video.*;
 import processing.serial.*;
 import java.awt.Rectangle;
 
-Movie myMovie;
+Movie[] myMovies = new Movie[2];
+int movieIndex = 0;
 
 float gamma = 1.7;
 
@@ -68,16 +69,20 @@ void setup() {
   delay(20);
   println("Serial Ports List:");
   println(list);
-  serialConfigure("/dev/ttyACM0");  // change these to your port names
-  serialConfigure("/dev/ttyACM1");
+  serialConfigure("/dev/tty.usbmodem6350701");  // change these to your port names
+  serialConfigure("/dev/tty.usbmodem27296201");
   if (errorCount > 0) exit();
   for (int i=0; i < 256; i++) {
     gammatable[i] = (int)(pow((float)i / 255.0, gamma) * 255.0 + 0.5);
   }
-  myMovie = new Movie(this, "/tmp/Toy_Story.avi");
-  myMovie.loop();  // start the movie :-)
+  myMovies[0] = new Movie(this, "worm.avi");
+  myMovies[1] = new Movie(this, "sample.avi");
+  for (Movie myMovie : myMovies) {
+    myMovie.loop();
+    myMovie.pause();
+  }
+  myMovies[movieIndex].play();
 }
-
 
 // movieEvent runs for each new frame of movie data
 void movieEvent(Movie m) {
@@ -138,7 +143,8 @@ void image2data(PImage image, byte[] data, boolean layout) {
     for (x = xbegin; x != xend; x += xinc) {
       for (int i=0; i < 8; i++) {
         // fetch 8 pixels from the image, 1 for each pin
-        pixel[i] = image.pixels[x + (y + linesPerPin * i) * image.width];
+        int p = x + (y + linesPerPin * transformRow(i)) * image.width;
+        pixel[i] = image.pixels[p];
         pixel[i] = colorWiring(pixel[i]);
       }
       // convert 8 pixels to 24 bytes
@@ -151,6 +157,14 @@ void image2data(PImage image, byte[] data, boolean layout) {
       }
     }
   }
+}
+
+// Hack to reorder the rows of LEDs.
+// The 0th row of LEDs by index is actually visually at position 4,
+// so we have to select the 4th row from the image to fill it, and so on.
+int transformRow(int origRow) {
+  int[] mapping = new int[]{4,6,7,5,0,2,3,1};
+  return mapping[origRow];
 }
 
 // translate the 24 bit color from RGB to the actual
@@ -196,6 +210,7 @@ void serialConfigure(String portName) {
     return;
   }
   // only store the info and increase numPorts if Teensy responds properly
+  System.out.println("led image size is " + param[0] + "x" + param[1]);
   ledImage[numPorts] = new PImage(Integer.parseInt(param[0]), Integer.parseInt(param[1]), RGB);
   ledArea[numPorts] = new Rectangle(Integer.parseInt(param[5]), Integer.parseInt(param[6]),
                      Integer.parseInt(param[7]), Integer.parseInt(param[8]));
@@ -207,7 +222,7 @@ void serialConfigure(String portName) {
 void draw() {
   //println("draw");
   // show the original video
-  image(myMovie, 0, 80);
+  image(myMovies[movieIndex], 0, 80);
 
   // then try to show what was most recently sent to the LEDs
   // by displaying all the images for each port.
@@ -221,18 +236,21 @@ void draw() {
     // show what should appear on the LEDs
     image(ledImage[i], 240 - xsize / 2 + xloc, 10 + yloc);
   }
+  
+  // If the movie has ended reset it to the beginning
+  if (myMovies[movieIndex].time() >= myMovies[movieIndex].duration()){
+    myMovies[movieIndex].stop();
+    myMovies[movieIndex].play();
+  }
 }
 
 // respond to mouse clicks as pause/play
 boolean isPlaying = true;
 void mousePressed() {
-  if (isPlaying) {
-    myMovie.pause();
-    isPlaying = false;
-  } else {
-    myMovie.play();
-    isPlaying = true;
-  }
+  // Pause the current movie and start the next one.
+  myMovies[movieIndex].pause();
+  movieIndex = (movieIndex + 1) % myMovies.length;
+  myMovies[movieIndex].play();
 }
 
 // scale a number by a percentage, from 0 to 100
